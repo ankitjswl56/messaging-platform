@@ -10,6 +10,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: user
       RABBITMQ_DEFAULT_PASS: password
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: minio/minio
@@ -23,20 +28,74 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   minio-setup:
     image: minio/mc
     container_name: messaging-minio-setup
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      sleep 5;
       mc alias set myminio http://minio:9000 admin password123;
       mc mb myminio/chat-payloads --ignore-existing;
       mc anonymous set download myminio/chat-payloads;
       exit 0;
       "
+
+  backend-api:
+    build:
+      context: ./backend-api
+    container_name: messaging-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_USE_SSL=false
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=password123
+      - RABBITMQ_URL=amqp://user:password@rabbitmq:5672
+      - CORS_ORIGIN=http://localhost:3000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  worker-service:
+    build:
+      context: ./worker-service
+    container_name: messaging-worker
+    environment:
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_USE_SSL=false
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=password123
+      - RABBITMQ_URL=amqp://user:password@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: messaging-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    depends_on:
+      - backend-api
 
 volumes:
   minio_data:
