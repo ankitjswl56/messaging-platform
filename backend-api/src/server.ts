@@ -3,8 +3,8 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import { config } from './config/env';
-import { generatePresignedUploadUrl } from './services/minio';
-import { connectRabbitMQ, publishZipJob } from './services/rabbitmq';
+import { generatePresignedDownloadUrl, generatePresignedUploadUrl } from './services/minio';
+import { connectRabbitMQ, consumeZipResults, publishZipJob } from './services/rabbitmq';
 
 const app = express();
 const httpServer = createServer(app);
@@ -65,6 +65,13 @@ const bootstrap = async () => {
   try {
     await connectRabbitMQ();
     console.log('Connected to RabbitMQ');
+
+    await consumeZipResults(async (room, zipFileName) => {
+      console.log(`Zip ready for room ${room}: ${zipFileName}`);
+      const downloadUrl = await generatePresignedDownloadUrl(zipFileName);
+      
+      io.to(room).emit('zip_ready', { downloadUrl, fileName: zipFileName });
+    });
 
     httpServer.listen(config.port, () => {
       console.log(`Backend API running on port ${config.port}`);

@@ -2,7 +2,6 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  port: process.env.PORT || 3001,
   minio: {
     endpoint: process.env.MINIO_ENDPOINT || 'localhost',
     port: parseInt(process.env.MINIO_PORT || '9000', 10),
@@ -13,8 +12,7 @@ export const config = {
   },
   rabbitmq: {
     url: process.env.RABBITMQ_URL || 'amqp://user:password@localhost:5672',
-    queueName: 'zip_jobs',
+    jobQueue: 'zip_jobs',
     resultQueue: 'zip_results',
   },
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 };

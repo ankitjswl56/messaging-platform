@@ -22,3 +22,21 @@ export const publishZipJob = async (room: string, files: string[], jobId: string
   const payload = JSON.stringify({ room, files, jobId });
   channel.sendToQueue(config.rabbitmq.queueName, Buffer.from(payload), { persistent: true });
 };
+
+export const consumeZipResults = async (onResult: (room: string, zipFileName: string) => void): Promise<void> => {
+  if (!channel) throw new Error('RabbitMQ channel is not established');
+
+  channel.consume(config.rabbitmq.resultQueue, (msg) => {
+    if (!msg) return;
+    if (!channel) throw new Error('RabbitMQ channel is not established');
+
+    try {
+      const { room, zipFileName } = JSON.parse(msg.content.toString());
+      onResult(room, zipFileName);
+      channel.ack(msg);
+    } catch (error) {
+      console.error('Failed to process zip result', error);
+      channel.nack(msg, false, false);
+    }
+  });
+};
