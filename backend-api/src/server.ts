@@ -1,0 +1,78 @@
+import express, { Request, Response } from 'express';
+import { createServer } from 'http';
+import { Server, Socket } from 'socket.io';
+import cors from 'cors';
+import { config } from './config/env';
+import { generatePresignedUploadUrl } from './services/minio';
+import { connectRabbitMQ, publishZipJob } from './services/rabbitmq';
+
+const app = express();
+const httpServer = createServer(app);
+
+app.use(cors({ origin: config.corsOrigin }));
+app.use(express.json());
+
+const io = new Server(httpServer, {
+  cors: {
+    origin: config.corsOrigin,
+    methods: ['GET', 'POST'],
+  },
+});
+
+app.post('/api/upload-url', async (req: Request, res: Response) => {
+  try {
+    const { fileName } = req.body;
+    if (!fileName) {
+      return res.status(400).json({ error: 'fileName is required' });
+    }
+
+    const url = await generatePresignedUploadUrl(fileName);
+    return res.json({ url });
+  } catch (error) {
+    console.error('Failed to generate upload URL', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/request-zip', async (req: Request, res: Response) => {
+  try {
+    const { room, files } = req.body;
+    if (!room || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: 'Invalid payload' });
+    }
+
+    const jobId = `job_${Date.now()}`;
+    await publishZipJob(room, files, jobId);
+
+    return res.status(202).json({ message: 'Zip job queued', jobId });
+  } catch (error) {
+    console.error('Failed to queue zip job', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+io.on('connection', (socket: Socket) => {
+  socket.on('join_room', (room: string) => {
+    socket.join(room);
+  });
+
+  socket.on('send_message', (data: { room: string; message: string }) => {
+    io.to(data.room).emit('receive_message', data);
+  });
+});
+
+const bootstrap = async () => {
+  try {
+    await connectRabbitMQ();
+    console.log('Connected to RabbitMQ');
+
+    httpServer.listen(config.port, () => {
+      console.log(`Backend API running on port ${config.port}`);
+    });
+  } catch (error) {
+    console.error('Bootstrap failed', error);
+    process.exit(1);
+  }
+};
+
+bootstrap();
