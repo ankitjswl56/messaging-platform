@@ -25,6 +25,7 @@ services:
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: password123
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://localhost:3000"
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
@@ -51,7 +52,12 @@ services:
   backend-api:
     build:
       context: ./backend-api
+      target: builder
     container_name: messaging-backend
+    command: pnpm run dev
+    volumes:
+      - ./backend-api:/app
+      - /app/node_modules
     ports:
       - "3001:3001"
     environment:
@@ -72,7 +78,12 @@ services:
   worker-service:
     build:
       context: ./worker-service
+      target: builder
     container_name: messaging-worker
+    command: pnpm run dev
+    volumes:
+      - ./worker-service:/app
+      - /app/node_modules
     environment:
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
@@ -89,11 +100,18 @@ services:
   frontend:
     build:
       context: ./frontend
+      target: builder
     container_name: messaging-frontend
+    command: pnpm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - HOST=0.0.0.0
     depends_on:
       - backend-api
 

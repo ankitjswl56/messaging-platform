@@ -1,39 +1,28 @@
 node_modules/
-dist/
-.env
-.next/
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
+backend-api/.pnpm-store/
+worker-service/.pnpm-store/
+frontend/.pnpm-store/
 
-node_modules/
-npm-debug.log
-yarn-error.log
-yarn-debug.log
+.next/
+out/
+frontend/.next/
+
+dist/
+**/dist/
+*.tsbuildinfo
 
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-
-frontend/dist/
-frontend/build/
-backend/dist/
-worker/dist/
-tsc-out/
-
-worker/tmp/
-*.mp4
-**/fileSequence*.ts
-*.m3u8
-
-postgres-data/
-minio-data/
-rabbitmq-data/
+**/.env*
 
 .DS_Store
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+
+# Docker
+.docker/

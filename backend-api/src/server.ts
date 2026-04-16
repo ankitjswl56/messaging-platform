@@ -27,6 +27,7 @@ app.post('/api/upload-url', async (req: Request, res: Response) => {
     }
 
     const url = await generatePresignedUploadUrl(fileName);
+
     return res.json({ url });
   } catch (error) {
     console.error('Failed to generate upload URL', error);
