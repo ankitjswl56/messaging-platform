@@ -52,13 +52,46 @@ app.post('/api/request-zip', async (req: Request, res: Response) => {
   }
 });
 
+interface ChatMessage {
+  id: string;
+  room: string;
+  message: string;
+  senderId: string;
+  fileUrl?: string;
+  timestamp: number;
+}
+
+const roomHistory: Record<string, ChatMessage[]> = {};
+const MAX_HISTORY = 50;
+
 io.on('connection', (socket: Socket) => {
   socket.on('join_room', (room: string) => {
     socket.join(room);
+
+    const history = roomHistory[room] || [];
+    socket.emit('message_history', history);
   });
 
-  socket.on('send_message', (data: { room: string; message: string }) => {
-    io.to(data.room).emit('receive_message', data);
+  socket.on('send_message', (data: { room: string; message: string; senderId: string; fileUrl?: string }) => {
+    const newMsg: ChatMessage = {
+      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      room: data.room,
+      message: data.message,
+      senderId: data.senderId,
+      fileUrl: data.fileUrl,
+      timestamp: Date.now(),
+    };
+
+    if (!roomHistory[data.room]) {
+      roomHistory[data.room] = [];
+    }
+    roomHistory[data.room].push(newMsg);
+
+    if (roomHistory[data.room].length > MAX_HISTORY) {
+      roomHistory[data.room].shift();
+    }
+
+    io.to(data.room).emit('receive_message', newMsg);
   });
 });
 
